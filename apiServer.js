@@ -75,6 +75,17 @@ app.post("/mine", async (req, res) => {
   }
 });
 
+app.get("/blocks", (req, res) => {
+  try {
+    res.json({
+      message: "Lista de blocos na blockchain:",
+      blocks: blockchain.chain,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao buscar os blocos." });
+  }
+});
+
 app.get("/balance/:address", (req, res) => {
   const address = req.params.address;
 
