@@ -8,5 +8,9 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "blockchain-node": "file:",
+    "elliptic": "^6.6.1"
+  }
 }

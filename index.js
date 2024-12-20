@@ -1,17 +1,31 @@
-const Blockchain = require('./blockchain');
-const Block = require('./block');
+const Blockchain = require("./blockchain");
+const Transaction = require("./transaction");
+const EC = require("elliptic").ec;
+const ec = new EC("secp256k1");
 
-// Criar um blockchain
-let myBlockchain = new Blockchain();
+const myKey = ec.genKeyPair();
+const myWalletAddress = myKey.getPublic("hex");
 
-console.log('Adicionando o bloco 1...');
-myBlockchain.addBlock(new Block(1, '18/12/2024', { amount: 4 }));
+const myBlockchain = new Blockchain();
 
-console.log('Adicionando o bloco 2...');
-myBlockchain.addBlock(new Block(2, '19/12/2024', { amount: 10 }));
+async function simulateBlockchain() {
+  const tx1 = new Transaction(myWalletAddress, "address2", 50);
+  tx1.signTransaction(myKey);
 
-// Verificar a integridade da cadeia
-console.log('O blockchain é válido?', myBlockchain.isChainValid());
+  const tx2 = new Transaction(myWalletAddress, "address3", 20);
+  tx2.signTransaction(myKey);
 
-// Exibir os blocos
-console.log(JSON.stringify(myBlockchain, null, 4));
+  const tx3 = new Transaction(myWalletAddress, "address3", 20);
+  tx2.signTransaction(myKey);
+
+  console.log("Adicionando transações...");
+  await myBlockchain.addTransaction(tx1);
+  await myBlockchain.addTransaction(tx2);
+
+  console.log(
+    "Saldo da minha carteira:",
+    myBlockchain.getBalance(myWalletAddress)
+  );
+}
+
+simulateBlockchain();
