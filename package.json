@@ -11,6 +11,8 @@
   "license": "ISC",
   "dependencies": {
     "blockchain-node": "file:",
-    "elliptic": "^6.6.1"
+    "cross-env": "^7.0.3",
+    "elliptic": "^6.6.1",
+    "ws": "^8.18.0"
   }
 }

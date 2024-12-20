@@ -1,31 +1,33 @@
 const Blockchain = require("./blockchain");
 const Transaction = require("./transaction");
+const P2PNetwork = require("./p2pNetwork");
 const EC = require("elliptic").ec;
 const ec = new EC("secp256k1");
 
-const myKey = ec.genKeyPair();
-const myWalletAddress = myKey.getPublic("hex");
-
 const myBlockchain = new Blockchain();
+const myNetwork = new P2PNetwork(myBlockchain);
 
-async function simulateBlockchain() {
+const PORT = process.env.PORT || 6001;
+
+myNetwork.startServer(PORT);
+
+if (process.env.PEER) {
+  myNetwork.connectToNode(process.env.PEER);
+}
+
+(async () => {
+  const myKey = ec.genKeyPair();
+  const myWalletAddress = myKey.getPublic("hex");
+
   const tx1 = new Transaction(myWalletAddress, "address2", 50);
   tx1.signTransaction(myKey);
 
-  const tx2 = new Transaction(myWalletAddress, "address3", 20);
-  tx2.signTransaction(myKey);
+  myBlockchain.addTransaction(tx1);
+  myNetwork.broadcastTransaction(tx1);
 
-  const tx3 = new Transaction(myWalletAddress, "address3", 20);
-  tx2.signTransaction(myKey);
+  console.log("Iniciando mineração...");
+  myBlockchain.minePendingTransactions(myWalletAddress);
 
-  console.log("Adicionando transações...");
-  await myBlockchain.addTransaction(tx1);
-  await myBlockchain.addTransaction(tx2);
-
-  console.log(
-    "Saldo da minha carteira:",
-    myBlockchain.getBalance(myWalletAddress)
-  );
-}
-
-simulateBlockchain();
+  const lastBlock = myBlockchain.getLatestBlock();
+  myNetwork.broadcastMine(lastBlock);
+})();
