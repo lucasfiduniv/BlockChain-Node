@@ -10,15 +10,16 @@ class Transaction {
   }
 
   calculateHash() {
-    return require("crypto")
-      .createHash("sha256")
-      .update(this.fromAddress + this.toAddress + this.amount)
-      .digest("hex");
+    return (
+      this.fromAddress +
+      this.toAddress +
+      this.amount
+    );
   }
 
   signTransaction(signingKey) {
     if (signingKey.getPublic("hex") !== this.fromAddress) {
-      throw new Error("Você não pode assinar transações de outras carteiras!");
+      throw new Error("Você não pode assinar transações para outros endereços!");
     }
 
     const hashTx = this.calculateHash();
@@ -30,12 +31,11 @@ class Transaction {
     if (this.fromAddress === null) return true;
 
     if (!this.signature || this.signature.length === 0) {
-      throw new Error("Transação não está assinada!");
+      throw new Error("Sem assinatura nesta transação!");
     }
 
     const publicKey = ec.keyFromPublic(this.fromAddress, "hex");
-    const hashTx = this.calculateHash();
-    return publicKey.verify(hashTx, this.signature);
+    return publicKey.verify(this.calculateHash(), this.signature);
   }
 }
 

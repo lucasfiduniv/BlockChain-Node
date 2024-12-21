@@ -6,6 +6,7 @@ const MESSAGE_TYPES = {
   TRANSACTION: "TRANSACTION",
   MINE: "MINE",
   REQUEST_CHAIN: "REQUEST_CHAIN",
+  START_MINING: "START_MINING",
 };
 
 class P2PNetwork {
@@ -41,69 +42,76 @@ class P2PNetwork {
   connectSocket(socket) {
     this.sockets.push(socket);
 
-    socket.on("message", (message) => {
+socket.on("message", (message) => {
+    try {
       const data = JSON.parse(message);
       this.handleMessage(socket, data);
-    });
+    } catch (error) {
+      console.error("Erro ao processar mensagem recebida:", error.message);
+    }
+  });
 
-    this.sendBlockchain(socket); 
-  }
-
-  handleMessage(socket, message) {
-  switch (message.type) {
-    case MESSAGE_TYPES.CHAIN:
-      console.log("Recebendo blockchain...");
-      this.blockchain.handleBlockchainSync(message.chain);
-      break;
-
-    case MESSAGE_TYPES.TRANSACTION:
-      console.log("Recebendo transação...");
-      const transactionData = message.transaction;
-
-      const transaction = new Transaction(
-        transactionData.fromAddress,
-        transactionData.toAddress,
-        transactionData.amount
-      );
-      transaction.signature = transactionData.signature;
-
-      try {
-        this.blockchain.addTransaction(transaction);
-        console.log("Transação adicionada com sucesso.");
-      } catch (error) {
-        console.error("Erro ao adicionar transação:", error.message);
-      }
-      break;
-
-    case MESSAGE_TYPES.MINE:
-      console.log("Recebendo novo bloco...");
-      const block = message.block;
-      if (this.blockchain.isValidBlock(block)) {
-        this.blockchain.chain.push(block);
-        console.log("Bloco adicionado à blockchain.");
-        this.broadcastChain();
-      } else {
-        console.log("Bloco inválido recebido.");
-      }
-      break;
-
-    case MESSAGE_TYPES.REQUEST_CHAIN:
-      console.log("Respondendo solicitação de blockchain...");
-      this.sendBlockchain(socket);
-      break;
-
-    default:
-      console.error("Mensagem desconhecida recebida:", message.type);
-  }
+  this.requestChain(socket);
 }
 
 
+  handleMessage(socket, message) {
+    switch (message.type) {
+      case MESSAGE_TYPES.CHAIN:
+        console.log("Recebendo blockchain...");
+        if (this.blockchain.replaceChain(message.chain)) {
+          console.log("Cadeia local substituída pela cadeia recebida.");
+          this.broadcastChain();
+        } else {
+          console.log("Cadeia recebida foi ignorada.");
+        }
+        break;
 
-  sendBlockchain(socket) {
+      case MESSAGE_TYPES.TRANSACTION:
+        console.log("Recebendo transação...");
+        try {
+          const transaction = new Transaction(
+            message.transaction.fromAddress,
+            message.transaction.toAddress,
+            message.transaction.amount
+          );
+          transaction.signature = message.transaction.signature;
+          this.blockchain.addTransaction(transaction);
+          console.log("Transação adicionada com sucesso.");
+        } catch (error) {
+          console.error("Erro ao adicionar transação:", error.message);
+        }
+        break;
+
+      case MESSAGE_TYPES.START_MINING:
+        console.log("Iniciando mineração contínua por solicitação remota...");
+        this.blockchain.minePendingTransactions(message.minerAddress);
+        break;
+
+      case MESSAGE_TYPES.REQUEST_CHAIN:
+        console.log("Respondendo solicitação de blockchain...");
+        this.sendBlockchain(socket);
+        break;
+
+      default:
+        console.error("Mensagem desconhecida recebida:", message.type);
+    }
+  }
+
+sendBlockchain(socket) {
+  socket.send(
+    JSON.stringify({
+      type: MESSAGE_TYPES.CHAIN,
+      chains: [this.blockchain.chain],
+    })
+  );
+}
+
+  requestChain(socket) {
+  
     socket.send(
       JSON.stringify({
-        type: MESSAGE_TYPES.CHAIN,
-        chain: this.blockchain.chain,
+        type: MESSAGE_TYPES.REQUEST_CHAIN,
       })
     );
   }
@@ -119,12 +127,12 @@ class P2PNetwork {
     });
   }
 
-  broadcastMine(block) {
+  broadcastStartMining(minerAddress) {
     this.sockets.forEach((socket) => {
       socket.send(
         JSON.stringify({
-          type: MESSAGE_TYPES.MINE,
-          block,
+          type: MESSAGE_TYPES.START_MINING,
+          minerAddress,
         })
       );
     });

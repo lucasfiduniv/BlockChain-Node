@@ -8,6 +8,7 @@ class Block {
     this.previousHash = previousHash;
     this.hash = this.calculateHash();
     this.nonce = 0;
+    this.miner = null; 
   }
 
   calculateHash() {
@@ -15,22 +16,20 @@ class Block {
       .createHash("sha256")
       .update(
         this.index +
-          this.previousHash +
           this.timestamp +
           JSON.stringify(this.transactions) +
+          this.previousHash +
           this.nonce
       )
       .digest("hex");
   }
 
   mineBlock(difficulty) {
-    while (
-      this.hash.substring(0, difficulty) !== Array(difficulty + 1).join("0")
-    ) {
+    while (!this.hash.startsWith("0".repeat(difficulty))) {
       this.nonce++;
       this.hash = this.calculateHash();
     }
-    console.log(`Bloco minerado: ${this.hash}`);
+    console.log(`Bloco minerado com hash: ${this.hash}`);
   }
 }
 

@@ -6,6 +6,7 @@ const ec = new EC("secp256k1");
 
 const blockchain = new Blockchain();
 const p2pNetwork = new P2PNetwork(blockchain);
+blockchain.setP2PNetwork(p2pNetwork);
 
 const P2P_PORT = process.env.P2P_PORT || 6001;
 
@@ -24,7 +25,4 @@ const minerAddress = minerKey.getPublic("hex");
 
 setInterval(() => {
   blockchain.minePendingTransactions(minerAddress);
-  const lastBlock = blockchain.getLatestBlock();
-  console.log("Novo bloco minerado:", lastBlock);
-  p2pNetwork.broadcastMine(lastBlock);
-}, 60000);
+}, 10000);
