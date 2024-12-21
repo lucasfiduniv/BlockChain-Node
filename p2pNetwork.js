@@ -1,12 +1,11 @@
 const WebSocket = require("ws");
+const Transaction = require("./transaction");
 
 const MESSAGE_TYPES = {
-  chain: "CHAIN",
-  transaction: "TRANSACTION",
-  mine: "MINE",
-  peer: "PEER",
-  ping: "PING",
-  pong: "PONG",
+  CHAIN: "CHAIN",
+  TRANSACTION: "TRANSACTION",
+  MINE: "MINE",
+  REQUEST_CHAIN: "REQUEST_CHAIN",
 };
 
 class P2PNetwork {
@@ -20,7 +19,7 @@ class P2PNetwork {
 
     server.on("connection", (socket) => {
       this.connectSocket(socket);
-      console.log("Novo nó conectado.");
+      console.log(`Novo nó conectado no servidor P2P na porta ${port}`);
     });
 
     console.log(`Servidor P2P rodando na porta ${port}`);
@@ -35,7 +34,7 @@ class P2PNetwork {
     });
 
     socket.on("error", (error) => {
-      console.error(`Erro ao conectar no nó ${address}:`, error.message);
+      console.error(`Erro ao conectar ao nó ${address}:`, error.message);
     });
   }
 
@@ -43,73 +42,98 @@ class P2PNetwork {
     this.sockets.push(socket);
 
     socket.on("message", (message) => {
-      this.handleMessage(socket, JSON.parse(message));
+      const data = JSON.parse(message);
+      this.handleMessage(socket, data);
     });
 
-    this.sendBlockchain(socket);
+    this.sendBlockchain(socket); 
   }
+
+  handleMessage(socket, message) {
+  switch (message.type) {
+    case MESSAGE_TYPES.CHAIN:
+      console.log("Recebendo blockchain...");
+      this.blockchain.handleBlockchainSync(message.chain);
+      break;
+
+    case MESSAGE_TYPES.TRANSACTION:
+      console.log("Recebendo transação...");
+      const transactionData = message.transaction;
+
+      const transaction = new Transaction(
+        transactionData.fromAddress,
+        transactionData.toAddress,
+        transactionData.amount
+      );
+      transaction.signature = transactionData.signature;
+
+      try {
+        this.blockchain.addTransaction(transaction);
+        console.log("Transação adicionada com sucesso.");
+      } catch (error) {
+        console.error("Erro ao adicionar transação:", error.message);
+      }
+      break;
+
+    case MESSAGE_TYPES.MINE:
+      console.log("Recebendo novo bloco...");
+      const block = message.block;
+      if (this.blockchain.isValidBlock(block)) {
+        this.blockchain.chain.push(block);
+        console.log("Bloco adicionado à blockchain.");
+        this.broadcastChain();
+      } else {
+        console.log("Bloco inválido recebido.");
+      }
+      break;
+
+    case MESSAGE_TYPES.REQUEST_CHAIN:
+      console.log("Respondendo solicitação de blockchain...");
+      this.sendBlockchain(socket);
+      break;
+
+    default:
+      console.error("Mensagem desconhecida recebida:", message.type);
+  }
+}
+
+
 
   sendBlockchain(socket) {
     socket.send(
       JSON.stringify({
-        type: MESSAGE_TYPES.chain,
+        type: MESSAGE_TYPES.CHAIN,
         chain: this.blockchain.chain,
       })
     );
   }
 
-  sendPeers(socket) {
-    const peerAddresses = this.sockets.map((s) => s._socket.remoteAddress);
-    socket.send(
-      JSON.stringify({
-        type: MESSAGE_TYPES.peer,
-        peers: peerAddresses,
-      })
-    );
-  }
-
   broadcastTransaction(transaction) {
-    this.sockets.forEach((socket) =>
+    this.sockets.forEach((socket) => {
       socket.send(
         JSON.stringify({
-          type: MESSAGE_TYPES.transaction,
+          type: MESSAGE_TYPES.TRANSACTION,
           transaction,
         })
-      )
-    );
+      );
+    });
   }
 
   broadcastMine(block) {
-    this.sockets.forEach((socket) =>
+    this.sockets.forEach((socket) => {
       socket.send(
         JSON.stringify({
-          type: MESSAGE_TYPES.mine,
+          type: MESSAGE_TYPES.MINE,
           block,
         })
-      )
-    );
+      );
+    });
   }
 
-  handleMessage(socket, message) {
-    switch (message.type) {
-      case MESSAGE_TYPES.chain:
-        this.blockchain.handleBlockchainSync(message.chain);
-        break;
-      case MESSAGE_TYPES.transaction:
-        this.blockchain.addTransaction(message.transaction);
-        break;
-      case MESSAGE_TYPES.mine:
-        this.blockchain.handleNewBlock(message.block);
-        break;
-      case MESSAGE_TYPES.peer:
-        message.peers.forEach((peer) => this.connectToNode(peer));
-        break;
-      case MESSAGE_TYPES.ping:
-        socket.send(JSON.stringify({ type: MESSAGE_TYPES.pong }));
-        break;
-      default:
-        console.error("Tipo de mensagem desconhecido:", message.type);
-    }
+  broadcastChain() {
+    this.sockets.forEach((socket) => {
+      this.sendBlockchain(socket);
+    });
   }
 }
 
