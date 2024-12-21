@@ -1,3 +1,4 @@
+const fs = require("fs");
 const Block = require("./block");
 const Transaction = require("./transaction");
 
@@ -41,10 +42,17 @@ class Blockchain {
     console.log("Bloco minerado com sucesso!");
     this.chain.push(block);
 
-    this.pendingTransactions = [
-      new Transaction(null, minerAddress, this.miningReward),
-    ];
+    this.pendingTransactions = [new Transaction(null, minerAddress, this.miningReward)];
   }
+  
+handleBlockchainSync(receivedChain) {
+  if (receivedChain.length > this.chain.length && this.isChainValid(receivedChain)) {
+    console.log("Blockchain substituída por uma versão mais longa.");
+    this.chain = receivedChain;
+  } else {
+    console.log("Blockchain recebida é inválida ou não é mais longa.");
+  }
+}
 
   getBalance(address) {
     let balance = 0;
@@ -82,6 +90,26 @@ class Blockchain {
     }
 
     return true;
+  }
+
+  isValidBlock(block) {
+    const previousBlock = this.getLatestBlock();
+
+    if (block.previousHash !== previousBlock.hash) return false;
+    if (block.hash !== block.calculateHash()) return false;
+
+    return true;
+  }
+
+  saveBlockchain() {
+    fs.writeFileSync("blockchain.json", JSON.stringify(this.chain, null, 2));
+  }
+
+  loadBlockchain() {
+    if (fs.existsSync("blockchain.json")) {
+      const data = fs.readFileSync("blockchain.json");
+      this.chain = JSON.parse(data);
+    }
   }
 }
 

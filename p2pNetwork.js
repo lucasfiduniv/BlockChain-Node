@@ -4,6 +4,9 @@ const MESSAGE_TYPES = {
   chain: "CHAIN",
   transaction: "TRANSACTION",
   mine: "MINE",
+  peer: "PEER",
+  ping: "PING",
+  pong: "PONG",
 };
 
 class P2PNetwork {
@@ -55,6 +58,16 @@ class P2PNetwork {
     );
   }
 
+  sendPeers(socket) {
+    const peerAddresses = this.sockets.map((s) => s._socket.remoteAddress);
+    socket.send(
+      JSON.stringify({
+        type: MESSAGE_TYPES.peer,
+        peers: peerAddresses,
+      })
+    );
+  }
+
   broadcastTransaction(transaction) {
     this.sockets.forEach((socket) =>
       socket.send(
@@ -80,39 +93,22 @@ class P2PNetwork {
   handleMessage(socket, message) {
     switch (message.type) {
       case MESSAGE_TYPES.chain:
-        this.handleBlockchainSync(message.chain);
+        this.blockchain.handleBlockchainSync(message.chain);
         break;
-
       case MESSAGE_TYPES.transaction:
         this.blockchain.addTransaction(message.transaction);
         break;
-
       case MESSAGE_TYPES.mine:
-        this.handleNewBlock(message.block);
+        this.blockchain.handleNewBlock(message.block);
         break;
-
+      case MESSAGE_TYPES.peer:
+        message.peers.forEach((peer) => this.connectToNode(peer));
+        break;
+      case MESSAGE_TYPES.ping:
+        socket.send(JSON.stringify({ type: MESSAGE_TYPES.pong }));
+        break;
       default:
         console.error("Tipo de mensagem desconhecido:", message.type);
-    }
-  }
-
-  handleBlockchainSync(receivedChain) {
-    if (receivedChain.length > this.blockchain.chain.length) {
-      console.log("Blockchain atualizada a partir de outro nó.");
-      this.blockchain.chain = receivedChain;
-    } else {
-      console.log("A blockchain local está atualizada.");
-    }
-  }
-
-  handleNewBlock(block) {
-    const lastBlock = this.blockchain.getLatestBlock();
-
-    if (lastBlock.hash === block.previousHash) {
-      this.blockchain.chain.push(block);
-      console.log("Novo bloco adicionado à blockchain.");
-    } else {
-      console.error("Bloco recebido é inválido ou fora de ordem.");
     }
   }
 }
